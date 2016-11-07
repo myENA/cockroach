@@ -95,6 +95,10 @@ var Aggregates = map[string][]Builtin{
 		makeAggBuiltin(TypeBytes, TypeBytes, newBytesConcatAggregate),
 	},
 
+	"csv_agg": {
+		makeAggBuiltin(TypeString, TypeString, newCsvConcatAggregate),
+	},
+
 	"count": countImpls(),
 
 	"max": makeAggBuiltins(newMaxAggregate, TypeBool, TypeInt, TypeFloat, TypeDecimal, TypeString, TypeBytes, TypeDate, TypeTimestamp, TypeTimestampTZ, TypeInterval),
@@ -235,13 +239,20 @@ type concatAggregate struct {
 	forBytes   bool
 	sawNonNull bool
 	result     bytes.Buffer
+	sep        string
+	count      int
 }
 
 func newBytesConcatAggregate() AggregateFunc {
 	return &concatAggregate{forBytes: true}
 }
+
 func newStringConcatAggregate() AggregateFunc {
 	return &concatAggregate{}
+}
+
+func newCsvConcatAggregate() AggregateFunc {
+	return &concatAggregate{sep: ","}
 }
 
 func (a *concatAggregate) Add(datum Datum) {
@@ -255,7 +266,11 @@ func (a *concatAggregate) Add(datum Datum) {
 	} else {
 		arg = string(*datum.(*DString))
 	}
+	if a.sep != "" && a.count > 0 {
+		a.result.WriteString(a.sep)
+	}
 	a.result.WriteString(arg)
+	a.count++
 }
 
 func (a *concatAggregate) Result() Datum {
